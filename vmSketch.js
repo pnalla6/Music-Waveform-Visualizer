@@ -3,24 +3,24 @@ var fft;
 var zoomFactor = 300;
 function preload() {
     musicFile = loadSound('./music/industry_felix.mp3');
-    if (screen.orientation.type === 'landscape-primary') zoomFactor = 300; else zoomFactor = 100;
 }
 
 function setup() {
+
     if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
         zoomFactor = 100;
     }
     let p = createP(zoomFactor);
     p.style('color', 'white');
-    p.position(200, 0);
+    p.position(200, -10);
     window.addEventListener("orientationchange", () => {
-        // window.location.reload();
+        window.location.reload();
     }, true);
     createCanvas(windowWidth, windowHeight)
     fft = new p5.FFT();
     // test slider
     slider = createSlider(0, 255, 100);
-    slider.position(225, 15);
+    slider.position(225, 5);
     slider.style('width', '80px', 'color', 'red');
 
     //select music
