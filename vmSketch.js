@@ -38,7 +38,7 @@ function draw() {
     stroke(255)
     // stroke(`rgb(${parseInt(random(255))},${parseInt(random(255))},${parseInt(random(255))})`);
     // noFill();
-    strokeWeight(2);
+    // strokeWeight(2);
     var waveForm = fft.waveform();
     beginShape();
     for (var i = 0; i < width; i++) {
