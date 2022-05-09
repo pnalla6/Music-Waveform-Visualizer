@@ -12,9 +12,6 @@ function setup() {
     if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
         zoomFactor = 100;
     }
-    let p = createP(zoomFactor);
-    p.style('color', 'white');
-    p.position(200, -10);
     window.addEventListener("orientationchange", () => {
         window.location.reload();
     }, true);
@@ -24,7 +21,7 @@ function setup() {
     slider = createSlider(0, 255, 100);
     slider.position(225, 5);
     slider.style('width', '80px', 'color', 'red');
-
+    showZoomFactor();
     //select music
     sel = createSelect();
     sel.position(10, 10);
@@ -44,8 +41,7 @@ function draw() {
     zoomFactor = map(sliderValue, 0, 255, 50, 500);
     background(0);
     if (strokeValue) stroke(`rgb(${parseInt(random(255))},${parseInt(random(255))},${parseInt(random(255))})`); else stroke(255);
-    // noFill();
-    strokeWeight(3);
+    strokeWeight(1.3);
     var waveForm = fft.waveform();
     beginShape();
     for (var i = 0; i < width; i++) {
@@ -54,10 +50,10 @@ function draw() {
         point(x, y);
     }
     endShape();
+
 }
 
 function playMusic() {
-    console.log('ok');
     if (mouseButton !== RIGHT) {
         if (musicFile.isPlaying()) musicFile.pause(); else musicFile.play()
     }
@@ -71,4 +67,11 @@ function changeMusicFile() {
 
 function changeStroke() {
     strokeValue = !strokeValue;
+}
+
+function showZoomFactor() {
+    let p = createP('zfactor');
+    p.style('color', 'white');
+    p.style('font-size', '0.7rem');
+    p.position(190, 0);
 }
