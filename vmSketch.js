@@ -35,8 +35,8 @@ function draw() {
     let sliderValue = slider.value();
     zoomFactor = map(sliderValue, 0, 255, 50, 500);
     background(0);
-    stroke(255)
-    // stroke(`rgb(${parseInt(random(255))},${parseInt(random(255))},${parseInt(random(255))})`);
+    // stroke(255)
+    stroke(`rgb(${parseInt(random(255))},${parseInt(random(255))},${parseInt(random(255))})`);
     // noFill();
     // strokeWeight(2);
     var waveForm = fft.waveform();
