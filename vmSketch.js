@@ -31,7 +31,7 @@ function setup() {
     sel.changed(changeMusicFile);
 
     //change stroke value
-    checkbox = createCheckbox('go rainbow!', false);
+    checkbox = createCheckbox('RGB', false);
     checkbox.position(310, 6);
     checkbox.style('color', 'white');
     checkbox.changed(changeStroke);
