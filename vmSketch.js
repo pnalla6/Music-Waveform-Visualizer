@@ -10,6 +10,7 @@ let circle_w = 150;
 let circle_h = 350;
 let stroke_weight = 0;
 let particles = [];
+let num_of_particles=500;
 
 
 function preload() {
@@ -22,6 +23,10 @@ function setup() {
         circle_w = 50;
         circle_h = 200;
         stroke_weight = 4.25;
+        num_of_particles=200;
+
+        // adjust play icon
+        select("#playIcon").position(183,33);
     }
     window.addEventListener("orientationchange", () => {
         window.location.reload();
@@ -60,9 +65,10 @@ function setup() {
     // user music file
     fileInput = createFileInput(handleFile);
     fileInput.position(10, 30);
+    fileInput.style('width', '33vw');
 
     // setup initial particles
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < num_of_particles; i++) {
         particles.push(new Particle())
     }
 }
