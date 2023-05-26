@@ -1,16 +1,18 @@
 let musicFile;
-let songName = ['JindMahi_Nucleya','industry_felix','earth'];
+let songName = ['JindMahi_Nucleya', 'industry_felix', 'earth'];
 let fft;
 let checkbox;
 let fileInput;
 let zoomFactor = 300;
 let rgb = false;
 let shape = 3;
-let circle_w = 150;
-let circle_h = 350;
+// let circle_w = 150;
+// let circle_h = 350;
+let circle_w = 100;
+let circle_h = 300;
 let stroke_weight = 0;
 let particles = [];
-let num_of_particles=500;
+let num_of_particles = 500;
 
 
 function preload() {
@@ -23,10 +25,10 @@ function setup() {
         circle_w = 50;
         circle_h = 200;
         stroke_weight = 4.25;
-        num_of_particles=200;
+        num_of_particles = 200;
 
         // adjust play icon
-        select("#playIcon").position(183,33);
+        select("#playIcon").position(183, 33);
     }
     window.addEventListener("orientationchange", () => {
         window.location.reload();
@@ -34,6 +36,10 @@ function setup() {
     angleMode(DEGREES);
     createCanvas(windowWidth, windowHeight)
     fft = new p5.FFT();
+    fft.smooth(0);
+    frameRate(60);
+
+
 
     slider = createSlider(0, 255, 100);
     slider.position(225, 5);
@@ -43,9 +49,9 @@ function setup() {
     // music select
     sel = createSelect();
     sel.position(10, 10);
-    sel.option('Jind Mahi-Nucleya',0);
-    sel.option('Industry Baby-Felix',1);
-    sel.option('Earth-Tilden Parc',2);
+    sel.option('Jind Mahi-Nucleya', 0);
+    sel.option('Industry Baby-Felix', 1);
+    sel.option('Earth-Tilden Parc', 2);
     sel.changed(changeMusicFile);
 
     // shape select
@@ -73,6 +79,7 @@ function setup() {
     }
 }
 
+
 // draw
 function draw() {
     switch (shape) {
@@ -83,11 +90,11 @@ function draw() {
             linearSpectrum();
             break;
         case 3:
-            circleStarfield();
+            Starfield();
             break;
 
         default:
-            circleStarfield();
+            Starfield();
             break;
     }
 }
@@ -102,7 +109,7 @@ function playMusic() {
 // select user music
 function changeMusicFile() {
     musicFile.stop();
-    if(sel.value()){
+    if (sel.value()) {
         musicFile = loadSound(`./music/${songName[sel.value()]}.mp3`);
     }
     if (musicFile) musicFile.play();
@@ -135,76 +142,150 @@ function linearSpectrum() {
     let sliderValue = slider.value();
     zoomFactor = map(sliderValue, 0, 255, 50, 500);
     background(0);
-    if (rgb) stroke(`rgb(${parseInt(random(255))},${parseInt(random(255))},${parseInt(random(255))})`); else stroke(255);
+
+    let waveform = fft.waveform();
+    let smoothedWaveForm = movingAverage(waveform, 10); // Smooth the waveform
+
     strokeWeight(1.5);
-    let waveForm = fft.waveform();
+
     beginShape();
     for (var i = 0; i < width; i++) {
+        // Map the waveform value to a valid RGB color range (0-255)
+        let colorVal = map(smoothedWaveForm[i], -1, 1, 0, 255);
+        if (rgb) {
+            // Use the waveform value for the red channel, and random values for green and blue
+            stroke(colorVal, Math.random() * 255, Math.random() * 255);
+        } else {
+            stroke(255);
+        }
         let x = i;
-        let y = waveForm[floor(map(i, 0, windowWidth, 0, waveForm.length))] * zoomFactor + windowHeight / 2.0;
+        let y = smoothedWaveForm[floor(map(i, 0, windowWidth, 0, waveform.length))] * zoomFactor + windowHeight / 2.0;
         point(x, y);
     }
     endShape();
-
 }
+
+
 
 // 2. circular Spectrum
 function circularSpectrum() {
-    stroke_weight=10;
+    stroke_weight = 10;
     translate(width / 2, height / 2);
     let sliderValue = slider.value();
     zoomFactor = map(sliderValue, 0, 255, 50, 500);
     background(0);
-    if (rgb) stroke(`rgb(${parseInt(random(255))},${parseInt(random(255))},${parseInt(random(255))})`); else stroke(255);
+    // if (rgb) stroke(`rgb(${parseInt(random(255))},${parseInt(random(255))},${parseInt(random(255))})`); else stroke(255);
     strokeWeight(stroke_weight);
     let waveForm = fft.waveform();
+    let smoothedWaveForm = movingAverage(waveForm, 20); // Smooth the waveform
+
     beginShape();
-    for (var i = 0; i < 180; i++) {
+    for (var i = 0; i < 360; i++) {
+        // Map the waveform value to a valid RGB color range (0-255)
+        let colorVal = map(smoothedWaveForm[i], -1, 1, 0, 255);
+        if (rgb) {
+            // Use the waveform value for the red channel, and random values for green and blue
+            stroke(colorVal, Math.random() * 255, Math.random() * 255);
+        } else {
+            stroke(255);
+        }
         let x = i;
-        let y = waveForm[floor(map(i, 0, 180, 0, waveForm.length - 1))] * zoomFactor + windowHeight / 2.0;
-        let radius = map(waveForm[floor(map(i, 0, 180, 0, waveForm.length - 1))], -1, 1, circle_w, circle_h);
-        point(radius * -sin(i), radius * -cos(i));
+        let y = smoothedWaveForm[floor(map(i, 0, 360, 0, waveForm.length - 1))] * zoomFactor + windowHeight / 2.0;
+        let radius = map(waveForm[floor(map(i, 0, 360, 0, waveForm.length - 1))], -1, 1, circle_w, circle_h);
+        let averageRadius = (circle_w + circle_h) / 2; // average of circle_w and circle_h
+        curveVertex(radius * cos(i), radius * sin(i));
     }
     endShape();
-    beginShape();
-    for (var i = 0; i < 180; i++) {
-        let x = i;
-        let y = waveForm[floor(map(i, 0, 180, 0, waveForm.length - 1))] * zoomFactor + windowHeight / 2.0;
-        let radius = map(waveForm[floor(map(i, 0, 180, 0, waveForm.length - 1))], -1, 1, circle_w, circle_h);
-        point(radius * sin(i), radius * cos(i));
-    }
-    endShape();
+    // beginShape();
+    // for (var i = 0; i < 180; i++) {
+    //     let x = i;
+    //     let y = waveForm[floor(map(i, 0, 180, 0, waveForm.length - 1))] * zoomFactor + windowHeight / 2.0;
+    //     let radius = map(waveForm[floor(map(i, 0, 180, 0, waveForm.length - 1))], -1, 1, circle_w, circle_h);
+    //     point(radius * sin(i), radius * cos(i));
+    // }
+    // endShape();
 }
 
 
-// 3. circle starfield
-function circleStarfield() {
+// 3. Starfield
+function Starfield() {
     stroke_weight = 2;
-    strokeWeight(stroke_weight)
     background(0);
     smooth();
-    // orbitControl();
-    // translate(-width / 2, -height / 2, 0);
+
     let spectrum = fft.analyze();
     let waveform = fft.waveform();
+    let smoothedWaveForm = movingAverage(waveform, 50); // Smooth the waveform
+
     let sliderValue = slider.value();
     zoomFactor = map(sliderValue, 0, 255, 6, 66);
+
+    // Get the average volume across all frequencies
+    let avgFreqAmplitude = fft.getEnergy("bass", "treble") / 2;
+
+    // Start rotation
+    push();
+    translate(width / 2, height / 2);
+    rotate(frameCount * 0.01);
+
+    for (let i = 0; i < particles.length; i++) {
+        // Change particle radius based on smoothedWaveForm
+        particles[i].r = smoothedWaveForm[i] * zoomFactor;
+
+        // Change particle color based on its x and y positions
+        let colorValX = map(particles[i].x, 0, width, 0, 255);
+        let colorValY = map(particles[i].y, 0, height, 0, 255);
+        if (rgb) {
+            stroke(colorValX, colorValY, 255 - colorValX);
+        }
+        else {
+            stroke(255);
+        }
+
+        // Change stroke weight based on average frequency amplitude
+        strokeWeight(map(avgFreqAmplitude, 0, 255, 2, 10));
+
+        // Particle creation and movement now happen around the center
+        // particles[i].createParticle(width, height );
+        // particles[i].moveParticle();
+    }
+
+    // End rotation
+    pop();
+
+    // Draw the remaining shapes normally
     beginShape();
     for (let i = 0; i < particles.length; i++) {
         particles[i].createParticle();
-        particles[i].moveParticle();
-        particles[i].r = waveform[i] * zoomFactor;
-        // particles[i].xSpeed = waveform[i]*zoomFactor;
-        // particles[i].ySpeed = waveform[i]*zoomFactor;
     }
     endShape();
-
 }
+
 
 // resize canvas
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
 }
+
+// moving average
+function movingAverage(data, N) {
+    var sum = 0;
+    var result = [];
+
+    for (var i = 0; i < N; i++)
+        sum += data[i];
+
+    result[0] = sum / N;
+
+    for (var i = N; i < data.length; i++) {
+        sum = sum - data[i - N] + data[i];
+        result.push(sum / N);
+    }
+
+    return result;
+}
+
+
 
 
 // Particle Class
@@ -217,6 +298,19 @@ class Particle {
         this.ySpeed = random(-0.2, 0.2);
         // this.xSpeed = random(-1, 1);
         // this.ySpeed = random(-1, 1);
+        this.currentColor = color(random(255), random(255), random(255));
+        this.targetColor = color(random(255), random(255), random(255));
+        this.colorChangeSpeed = 0.01; // speed of color change (adjust as needed)
+    }
+
+    // lerpColor
+    lerpColor() {
+        this.currentColor = lerpColor(this.currentColor, this.targetColor, this.colorChangeSpeed);
+        let currentColorBrightness = brightness(this.currentColor);
+        let targetColorBrightness = brightness(this.targetColor);
+        if (abs(currentColorBrightness - targetColorBrightness) < 0.1) {
+            this.targetColor = color(random(255), random(255), random(255));
+        }
     }
 
     createParticle() {
