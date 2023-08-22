@@ -1,5 +1,6 @@
 let musicFile;
-let songName = ['JindMahi_Nucleya', 'industry_felix', 'earth'];
+// let songName = ['JindMahi_Nucleya', 'industry_felix', 'earth'];
+let songName = ['am_i_dreaming', 'barbie_aqua', 'earth'];
 let fft;
 let checkbox;
 let fileInput;
@@ -49,8 +50,8 @@ function setup() {
     // music select
     sel = createSelect();
     sel.position(10, 10);
-    sel.option('Jind Mahi-Nucleya', 0);
-    sel.option('Industry Baby-Felix', 1);
+    sel.option('Am I Dreaming', 0);
+    sel.option('Barbie Aqua', 1);
     sel.option('Earth-Tilden Parc', 2);
     sel.changed(changeMusicFile);
 
