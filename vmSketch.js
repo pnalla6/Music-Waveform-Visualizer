@@ -73,6 +73,12 @@ function setup() {
     fileInput = createFileInput(handleFile);
     fileInput.position(10, 30);
     fileInput.style('width', '33vw');
+    
+    document.addEventListener("keydown", function(event) {
+        if (event.keyCode === 32) { // keyCode 32 is the spacebar
+            playMusic();
+        }
+    });
 
     // setup initial particles
     for (let i = 0; i < num_of_particles; i++) {
