@@ -80,78 +80,146 @@ function starfield() {
     
     for (let i = 0; i < particles.length; i++) {
         particles[i].update();
-        particles[i].show(smoothedWaveForm[i] * zoomFactor, spectrum[i]);
+        // if(){
+
+            particles[i].show(smoothedWaveForm[i] * zoomFactor, spectrum[i*0.1]);
+        // }
     }
 }
 
 // Particle class for zooming effect
+// class Particle {
+//     constructor() {
+//         this.x = random(-width / 2, width / 2);
+//         this.y = random(-height / 2, height / 2);
+//         this.z = random(-width / 2, width / 2);
+//         this.r = 1;
+//         this.baseColor = color(255, 255, 255); // Golden color
+//         this.sparkle = random(100, 255);     // Random value for sparkle effect
+//         this.baseSpeed = random(0.2, 0.5);   // Slower base speed for particles
+//         this.speed = this.baseSpeed;          // Particle speed affected by the beat
+
+//         // Initialize random offsets for wandering
+//         this.offsetX = random(-1, 1);
+//         this.offsetY = random(-1, 1);
+//     }
+
+//     update() {
+//         // Get bass energy from FFT to sync the particle speed with beats
+//         let bassEnergy = fft.getEnergy("bass");
+
+//         // Map bass energy to particle speed, and lerp for smooth transitions
+//         let targetSpeed = map(bassEnergy, 0, 255, 0.2, 1); // Modulate speed based on bass
+//         this.speed = lerp(this.speed, targetSpeed, 0.05);  // Smoothly interpolate to new speed
+        
+//         // Update the z-axis movement (zoom effect) based on speed
+//         this.z -= this.speed * 0.5; // Slower zoom effect
+
+//         // Wandering effect
+//         this.x += random(this.offsetX);
+//         this.y += random(this.offsetY) * 0.7;
+
+//         // Check for boundaries to reverse direction
+//         if (this.x > width / 2 || this.x < -width / 2) {
+//             this.offsetX *= -1;
+//         }
+//         if (this.y > height / 2 || this.y < -height / 2) {
+//             this.offsetY *= -1;
+//         }
+
+//         // Mouse interaction: Move towards the mouse
+//         let mouseDist = dist(this.x, this.y, mouseX - width / 2, mouseY - height / 2);
+//         if (mouseDist < 150) { // If the mouse is within 150 pixels
+//             let angle = atan2(mouseY - height / 2, mouseX - width / 2);
+//             this.x += cos(angle) * 0.9; // Move towards mouse in the x direction
+//             this.y += sin(angle) * 0.9; // Move towards mouse in the y direction
+//         }
+
+//         // Respawn particles if they move out of view
+//         if (this.z < -width / 2) {
+//             this.z = random(-width / 2, width / 2);
+//             this.x = random(-width / 2, width / 2);
+//             this.y = random(-height / 2, height / 2);
+//             this.sparkle = random(100, 255); // Reset sparkle on respawn
+//         }
+//     }
+
+//     show(zoom, colorVal) {
+//         // Introduce a condition to only make some particles sparkle
+//         let shouldSparkle = random() < 0.1; // Adjust this value to change the sparkle density (0.1 means 10% sparkle)
+
+//         let glitter;
+//         if (shouldSparkle) {
+//             // Apply sparkle effect to base color if should sparkle
+//             glitter = color(this.baseColor.levels[0] + random(-this.sparkle, this.sparkle), 
+//                             this.baseColor.levels[1] + random(-this.sparkle, this.sparkle), 
+//                             this.baseColor.levels[2] + random(-this.sparkle, this.sparkle));
+//         } else {
+//             glitter = this.baseColor; // Regular color if not sparkling
+//         }
+
+//         strokeWeight(map(zoom, 0, 255, 2, 6));
+//         stroke(glitter);
+//         fill(glitter);
+//         ellipse(this.x, this.y, this.r * zoom / 200);
+//     }
+// }
+
 class Particle {
     constructor() {
         this.x = random(-width / 2, width / 2);
         this.y = random(-height / 2, height / 2);
-        this.z = random(-width / 2, width / 2);
-        this.r = random(2, 10.8);
-        this.baseColor = color(255, 255, 255); // Golden color
+        this.z = random(width / 2); // Depth starts positive to allow for zoom in
+        this.r = 1;
+        this.baseColor = color(255, 255, 255); // White color
         this.sparkle = random(100, 255);     // Random value for sparkle effect
         this.baseSpeed = random(0.2, 0.5);   // Slower base speed for particles
         this.speed = this.baseSpeed;          // Particle speed affected by the beat
-
-        // Initialize random offsets for wandering
-        this.offsetX = random(-1, 1);
-        this.offsetY = random(-1, 1);
     }
 
     update() {
         // Get bass energy from FFT to sync the particle speed with beats
         let bassEnergy = fft.getEnergy("bass");
 
-        // Map bass energy to particle speed, and lerp for smooth transitions
-        let targetSpeed = map(bassEnergy, 0, 255, 0.2, 1); // Modulate speed based on bass
-        this.speed = lerp(this.speed, targetSpeed, 0.05);  // Smoothly interpolate to new speed
+        // Map bass energy to particle zoom speed, modulating depth (z) movement based on rhythm
+        let targetSpeed = map(bassEnergy, 0, 255, 0.1, 1); // Slower when bass is low, faster when bass is high
+        this.speed = lerp(this.speed, targetSpeed, 0.05);  // Smooth transition to new speed
         
-        // Update the z-axis movement (zoom effect) based on speed
-        this.z -= this.speed * 0.5; // Slower zoom effect
-
-        // Wandering effect
-        this.x += random(this.offsetX);
-        // this.x += this.offsetX * 0.7;
-        this.y += random(this.offsetY) * 0.7;
-
-        // Check for boundaries to reverse direction
-        if (this.x > width / 2 || this.x < -width / 2) {
-            this.offsetX *= -1;
-        }
-        if (this.y > height / 2 || this.y < -height / 2) {
-            this.offsetY *= -1;
-        }
-
-        // Mouse interaction: Move towards the mouse
-        let mouseDist = dist(this.x, this.y, mouseX - width / 2, mouseY - height / 2);
-        if (mouseDist < 150) { // If the mouse is within 150 pixels
-            let angle = atan2(mouseY - height / 2, mouseX - width / 2);
-            this.x += cos(angle) * 0.5; // Move towards mouse in the x direction
-            this.y += sin(angle) * 0.5; // Move towards mouse in the y direction
-        }
-
-        // Respawn particles if they move out of view
-        if (this.z < -width / 2) {
-            this.z = random(-width / 2, width / 2);
-            this.x = random(-width / 2, width / 2);
+        // Update the z-axis movement (zoom effect) based on speed, moving slower or faster in rhythm
+        this.z -= this.speed * 10; // Increase this factor to control zoom speed
+        
+        // Reset particle when it moves too close
+        if (this.z < 1) {
+            this.z = random(width / 2, width); // Respawn with a random depth
+            this.x = random(-width / 2, width / 2); // Reset position
             this.y = random(-height / 2, height / 2);
             this.sparkle = random(100, 255); // Reset sparkle on respawn
         }
     }
 
-    show(zoom, colorVal) {
-        // Apply sparkle effect to base color
-        let glitter = color(this.baseColor.levels[0] + random(-this.sparkle, this.sparkle), 
+    show() {
+        // Scale the position and size of the particle based on its depth (z)
+        let sx = map(this.x / this.z, 0, 1, 0, width);
+        let sy = map(this.y / this.z, 0, 1, 0, height);
+        let r = map(this.z, 0, width / 2, 8, 0); // Size based on depth, particles closer to the screen are larger
+
+        // Sparkle condition (only some particles)
+        let shouldSparkle = random() < 0.1; // 10% chance to sparkle
+
+        let glitter;
+        if (shouldSparkle) {
+            // Apply sparkle effect to base color if sparkling
+            glitter = color(this.baseColor.levels[0] + random(-this.sparkle, this.sparkle), 
                             this.baseColor.levels[1] + random(-this.sparkle, this.sparkle), 
                             this.baseColor.levels[2] + random(-this.sparkle, this.sparkle));
+        } else {
+            glitter = this.baseColor; // Regular color if not sparkling
+        }
 
-        strokeWeight(map(zoom, 0, 255, 2, 10));
-        stroke(glitter);
+        // Draw the particle
+        noStroke();
         fill(glitter);
-        ellipse(this.x, this.y, this.r * zoom / 200);
+        ellipse(sx, sy, r); // Draw ellipse at scaled position with size based on depth
     }
 }
 
