@@ -5,33 +5,40 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- cache control  -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>MusicVisualizer-prashanthnalla</title>
+    <title>Music Visualizer</title>
 </head>
 
 <body>
+    <!-- Play button to control the music -->
     <img id="playIcon" src='./play_icon.png' alt="click to play" onclick="playMusic()">
+
+    <!-- Load p5.js and p5.sound library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/p5.min.js"
         integrity="sha512-NxocnqsXP3zm0Xb42zqVMvjQIktKEpTIbCXXyhBPxqGZHqhcOXHs4pXI/GoZ8lE+2NJONRifuBpi9DxC58L0Lw=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/addons/p5.sound.min.js"
         integrity="sha512-WzkwpdWEMAY/W8WvP9KS2/VI6zkgejR4/KTxTl4qHx0utqeyVE0JY+S1DlMuxDChC7x0oXtk/ESji6a0lP/Tdg=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <!-- Include the visualizer JavaScript file -->
     <script src="vmSketch.js"></script>
 
     <style>
+        /* Style the play button image */
         img {
-            width: 1.5625rem;
+            width: 2rem;
             background: white;
             display: block;
-            margin: auto;
+            margin: 10px auto;
             -webkit-filter: invert(1);
             filter: invert(1);
+            cursor: pointer;
         }
 
+        /* General styling for body */
         body {
             display: block;
             margin: 0;
@@ -40,22 +47,21 @@
             background-color: black;
         }
 
-        select {
+        /* Style for the slider control */
+        input[type="range"] {
             -webkit-appearance: none;
             background: black;
-            color: wheat;
+            color: white;
             border: none;
+            outline: none;
         }
 
-        div {
-            margin-right: 20rem;
-            vertical-align: middle;
-            font-size: xx-small;
-        }
-
-        ::-webkit-file-upload-button {
-            background: darkgray;
-            color: wheat;
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #fff;
+            cursor: pointer;
         }
     </style>
 </body>
