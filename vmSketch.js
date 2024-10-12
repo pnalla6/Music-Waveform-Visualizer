@@ -8,7 +8,7 @@ let particles = [];
 let num_of_particles = 500;
 
 function preload() {
-    musicFile = loadSound(`./music/babydoll.mp3`);
+    musicFile = loadSound(`./music/warriyo_mortals.mp3`);
 }
 
 function setup() {
@@ -173,26 +173,41 @@ class Particle {
         this.r = 1;
         this.baseColor = color(255, 255, 255); // White color
         this.sparkle = random(100, 255);     // Random value for sparkle effect
-        this.baseSpeed = random(0.2, 0.5);   // Slower base speed for particles
-        this.speed = this.baseSpeed;          // Particle speed affected by the beat
+        this.baseSpeed = random(0.2, 0.5);   // Initial slower speed for particles
+        this.speed = this.baseSpeed;         // Current speed based on energy
+        this.reverse = false;                // Indicates whether the particle is reversing
     }
 
     update() {
-        // Get bass energy from FFT to sync the particle speed with beats
+        // Get energy levels from FFT for bass frequencies
         let bassEnergy = fft.getEnergy("bass");
 
-        // Map bass energy to particle zoom speed, modulating depth (z) movement based on rhythm
-        let targetSpeed = map(bassEnergy, 0, 255, 0.1, 1); // Slower when bass is low, faster when bass is high
-        this.speed = lerp(this.speed, targetSpeed, 0.05);  // Smooth transition to new speed
-        
-        // Update the z-axis movement (zoom effect) based on speed, moving slower or faster in rhythm
-        this.z -= this.speed * 10; // Increase this factor to control zoom speed
-        
-        // Reset particle when it moves too close
-        if (this.z < 1) {
-            this.z = random(width / 2, width); // Respawn with a random depth
-            this.x = random(-width / 2, width / 2); // Reset position
-            this.y = random(-height / 2, height / 2);
+        // If bass energy is below a threshold, reverse movement (particles move backward)
+        if (bassEnergy < 80) {
+            this.reverse = true;
+        } else {
+            this.reverse = false;
+        }
+
+        // When bass is low, particles slow down or reverse
+        if (this.reverse) {
+            // Reverse movement when bass is low, making particles move backward
+            let reverseSpeed = map(bassEnergy, 0, 80, -0.1, 0); // Slower, reverse movement
+            this.speed = lerp(this.speed, reverseSpeed, 0.05); // Smooth transition to reverse speed
+        } else {
+            // When bass is high, speed up
+            let targetSpeed = map(bassEnergy, 80, 255, 0.1, 2); // Faster when bass is high
+            this.speed = lerp(this.speed, targetSpeed, 0.5); // Smooth transition to faster speed
+        }
+
+        // Update z-axis movement (zoom effect)
+        this.z -= this.speed * 10; // Increase factor to make zoom more pronounced
+
+        // Reset particle when it moves too close or too far
+        if (this.z < 1 || this.z > width) {
+            this.z = random(width / 2, width); // Respawn at a random depth
+            this.x = random(-width / 2, width / 2); // Reset x position
+            this.y = random(-height / 2, height / 2); // Reset y position
             this.sparkle = random(100, 255); // Reset sparkle on respawn
         }
     }
@@ -222,6 +237,79 @@ class Particle {
         ellipse(sx, sy, r); // Draw ellipse at scaled position with size based on depth
     }
 }
+
+// class Particle {
+//     constructor() {
+//         this.x = random(-width / 2, width / 2);
+//         this.y = random(-height / 2, height / 2);
+//         this.z = random(width / 2); // Depth starts positive to allow for zoom in
+//         this.r = 1;
+//         this.baseColor = color(255, 255, 255); // White color
+//         this.sparkle = random(100, 255);     // Random value for sparkle effect
+//         this.baseSpeed = random(0.2, 0.5);   // Slower base speed for particles
+//         this.speed = this.baseSpeed;          // Particle speed affected by the beat
+//         this.reverse = false;                // Track reverse state
+//     }
+
+//     update() {
+//         // Get energy levels from FFT for bass, mid, and treble frequencies
+//         let midEnergy = fft.getEnergy("mid");
+//         let trebleEnergy = fft.getEnergy("treble");
+//         let bassEnergy = fft.getEnergy("bass");
+
+//         // Calculate overall energy to detect strong beats
+//         let totalEnergy = bassEnergy + trebleEnergy + midEnergy;
+
+//         // Set reverse movement based on bass energy: reverse when low, forward when high
+        
+//         if (bassEnergy < 10) { // Threshold for reversing on low bass
+//             this.reverse = true;
+//         } else if (bassEnergy > 150) { // Threshold for speeding up on high bass
+//             this.reverse = false;
+//         }
+//         // console.log(bassEnergy, trebleEnergy, midEnergy);
+
+//         // Map bass energy to particle speed, slowing down when reverse is active
+//         let targetSpeed = this.reverse ? -0.2 : map(totalEnergy, 0, 255, 0.1, 1);
+//         this.speed = lerp(this.speed, targetSpeed, 0.05); // Smooth transition between speeds
+        
+//         // Update the z-axis movement (zoom effect), reverse or forward based on the state
+//         this.z += this.speed * 10; // If reverse is true, z increases (goes backward)
+
+//         // Reset particle when it moves too close or too far
+//         if (this.z < 1 || this.z > width) { 
+//             this.z = random(width / 2, width); // Respawn at a random depth
+//             this.x = random(-width / 2, width / 2); // Reset x position
+//             this.y = random(-height / 2, height / 2); // Reset y position
+//             this.sparkle = random(100, 255); // Reset sparkle on respawn
+//         }
+//     }
+
+//     show() {
+//         // Scale the position and size of the particle based on its depth (z)
+//         let sx = map(this.x / this.z, 0, 1, 0, width);
+//         let sy = map(this.y / this.z, 0, 1, 0, height);
+//         let r = map(this.z, 0, width / 2, 8, 0); // Size based on depth, particles closer to the screen are larger
+
+//         // Sparkle condition (only some particles)
+//         let shouldSparkle = random() < 0.1; // 10% chance to sparkle
+
+//         let glitter;
+//         if (shouldSparkle) {
+//             // Apply sparkle effect to base color if sparkling
+//             glitter = color(this.baseColor.levels[0] + random(-this.sparkle, this.sparkle), 
+//                             this.baseColor.levels[1] + random(-this.sparkle, this.sparkle), 
+//                             this.baseColor.levels[2] + random(-this.sparkle, this.sparkle));
+//         } else {
+//             glitter = this.baseColor; // Regular color if not sparkling
+//         }
+
+//         // Draw the particle
+//         noStroke();
+//         fill(glitter);
+//         ellipse(sx, sy, r); // Draw ellipse at scaled position with size based on depth
+//     }
+// }
 
 // Moving average for smoothing waveform
 function movingAverage(data, N) {
