@@ -3,67 +3,96 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
+    <meta name="description" content="A visually captivating music visualizer synchronized with audio.">
+    <meta name="author" content="Your Name">
     <title>Music Visualizer</title>
-</head>
 
-<body>
-    <!-- Play button to control the music -->
-    <img id="playIcon" src='./play_icon.png' alt="click to play" onclick="playMusic()">
+    <!-- Load p5.js and p5.sound libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/p5.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/addons/p5.sound.min.js" defer></script>
 
-    <!-- Load p5.js and p5.sound library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/p5.min.js"
-        integrity="sha512-NxocnqsXP3zm0Xb42zqVMvjQIktKEpTIbCXXyhBPxqGZHqhcOXHs4pXI/GoZ8lE+2NJONRifuBpi9DxC58L0Lw=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/addons/p5.sound.min.js"
-        integrity="sha512-WzkwpdWEMAY/W8WvP9KS2/VI6zkgejR4/KTxTl4qHx0utqeyVE0JY+S1DlMuxDChC7x0oXtk/ESji6a0lP/Tdg=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
-    <!-- Include the visualizer JavaScript file -->
-    <script src="vmSketch.js"></script>
+    <!-- Include the visualizer script -->
+    <script src="vmSketch.js" defer></script>
 
     <style>
-        /* Style the play button image */
-        img {
-            width: 2rem;
-            background: white;
-            display: block;
-            margin: 10px auto;
-            -webkit-filter: invert(1);
-            filter: invert(1);
-            cursor: pointer;
-        }
-
-        /* General styling for body */
+        /* Full screen setup and hidden overflow */
         body {
-            display: block;
             margin: 0;
             padding: 0;
             overflow: hidden;
             background-color: black;
         }
 
-        /* Style for the slider control */
-        input[type="range"] {
-            -webkit-appearance: none;
-            background: black;
-            color: white;
-            border: none;
-            outline: none;
+        /* Transparent play button in top left corner */
+        #playButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            /* padding: 5px; */
+            cursor: pointer;
+            display: block;
         }
 
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 15px;
-            height: 15px;
-            background: #fff;
+        #playButton img {
+            width: 0.8rem;
+            filter: invert(1);
+        }
+
+        /* General transparent UI styling */
+        button {
+            background-color: rgba(0, 0, 0, 0.3);
+            /* Semi-transparent background */
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            /* Light border */
+            padding: 5px 10px;
             cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.3s ease;
+            /* Smooth hover transition */
+            position: absolute;
+        }
+
+        button:hover {
+            background-color: rgba(0, 0, 0, 0.6);
+            /* Darken slightly on hover */
+        }
+
+        /* Position the shape switch button in the bottom right */
+        #shapeButton {
+            bottom: 10px;
+            right: 10px;
+        }
+
+        /* Display current shape name in the bottom left */
+        #shapeName {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background-color: rgba(0, 0, 0, 0.3);
+            /* Semi-transparent */
+            padding: 1px;
+            border-radius: 5px;
+        }
+
+        /* Div for displaying UI text */
+        div {
+            color: white;
+            font-family: Arial, sans-serif;
         }
     </style>
+</head>
+
+<body>
+    <!-- Accessible play/pause button for the music -->
+    <button id="playButton" aria-label="Play or pause the music" onclick="playMusic()">
+        <img src="./play_icon.png" alt="Play">
+    </button>
 </body>
 
 </html>
