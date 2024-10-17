@@ -3,24 +3,30 @@ const NUM_PARTICLES = 500;
 let particles = [];
 
 // UI elements
-let shapeButton;
+let shapeButton, switchSongButton, playButton;
 let fft;
-let musicFile;
+let musicFiles = []; // Array to hold multiple songs
+let currentSongIndex = 0;
+let crossfadeDuration = 3; // Duration of crossfade in seconds
+let isCrossfading = false;
 
 // Array of shape functions
 let shapeFunctions;
 let currentShapeIndex = 0;
 
 function preload() {
-    musicFile = loadSound('./music/king_shit.mp3', onLoadSuccess, onLoadError);
-}
+    const songPaths = [
+        './music/king_shit.mp3',
+        './music/babydoll.mp3',
+        './music/warriyo_mortals.mp3',
+        './music/am_i_dreaming.mp3',
+    ];
 
-function onLoadSuccess() {
-    console.log('Audio loaded successfully.');
-}
-
-function onLoadError(err) {
-    console.error('Error loading audio file:', err);
+    // Load songs into musicFiles array
+    for (let path of songPaths) {
+        let sound = loadSound(path);
+        musicFiles.push(sound);
+    }
 }
 
 function setup() {
@@ -40,6 +46,12 @@ function setup() {
 
     // Initialize shape functions
     shapeFunctions = [linearSpectrum, drawHeart, drawFlower, drawButterfly, starfield];
+
+    // Start playing the first song
+    if (musicFiles.length > 0) {
+        musicFiles[currentSongIndex].play();
+        playButton.html('Pause');
+    }
 }
 
 function draw() {
@@ -54,6 +66,11 @@ function draw() {
     if (currentFunction) {
         currentFunction();
     }
+
+    // Handle crossfading
+    if (isCrossfading) {
+        handleCrossfade();
+    }
 }
 
 function windowResized() {
@@ -62,10 +79,60 @@ function windowResized() {
 
 // Play or pause the music
 function playMusic() {
-    if (musicFile.isPlaying()) {
-        musicFile.pause();
+    let currentSong = musicFiles[currentSongIndex];
+    if (currentSong.isPlaying()) {
+        currentSong.pause();
+        playButton.html('Play');
     } else {
-        musicFile.play();
+        currentSong.play();
+        playButton.html('Pause');
+    }
+}
+
+// Switch to the next song with crossfade
+function switchSong() {
+    if (isCrossfading) return; // Prevent multiple crossfades at once
+
+    let currentSong = musicFiles[currentSongIndex];
+    currentSongIndex = (currentSongIndex + 1) % musicFiles.length;
+    let nextSong = musicFiles[currentSongIndex];
+
+    isCrossfading = true;
+
+    // Set initial volumes
+    currentSong.setVolume(1);
+    nextSong.setVolume(0);
+    nextSong.play();
+    playButton.html('Pause');
+
+    // Start crossfade timer
+    crossfadeStartTime = millis();
+}
+
+let crossfadeStartTime = 0;
+
+function handleCrossfade() {
+    let elapsed = (millis() - crossfadeStartTime) / 900; // Convert to seconds
+    let progress = elapsed / crossfadeDuration;
+
+    if (progress >= 1) {
+        // Crossfade complete
+        let previousSongIndex = (currentSongIndex - 1 + musicFiles.length) % musicFiles.length;
+        let previousSong = musicFiles[previousSongIndex];
+        previousSong.stop();
+        musicFiles[currentSongIndex].setVolume(1);
+        isCrossfading = false;
+    } else {
+        // Update volumes for crossfade
+        let previousSongIndex = (currentSongIndex - 1 + musicFiles.length) % musicFiles.length;
+        let previousSong = musicFiles[previousSongIndex];
+        let currentSong = musicFiles[currentSongIndex];
+
+        let fadeOutVolume = map(progress, 0, 1, 1, 0);
+        let fadeInVolume = map(progress, 0, 1, 0, 1);
+
+        previousSong.setVolume(fadeOutVolume);
+        currentSong.setVolume(fadeInVolume);
     }
 }
 
@@ -75,10 +142,34 @@ function createUI() {
     shapeButton = createButton('Switch Shape');
     shapeButton.position(10, 55);
     shapeButton.mousePressed(switchShape);
-    const shapeNames = ['Linear Spectrum', 'Heart', 'Flower', 'Butterfly', 'Starfield']; // Include all shapes
+    styleButton(shapeButton);
+
+    const shapeNames = ['Linear Spectrum', 'Heart', 'Flower', 'Butterfly', 'Starfield'];
     createDiv('Current Shape: ' + shapeNames[currentShapeIndex % shapeNames.length])
         .position(10, 80)
-        .id('shapeName');
+        .id('shapeName')
+        .style('color', 'white')
+        .style('background', 'rgba(0,0,0,0.5)')
+        .style('padding', '5px');
+
+    // Switch Song Button
+    switchSongButton = createButton('Switch Song');
+    switchSongButton.position(10, 105);
+    switchSongButton.mousePressed(switchSong);
+    styleButton(switchSongButton);
+
+    // Play/Pause Button
+    playButton = createButton('Pause');
+    playButton.position(10, 130);
+    playButton.mousePressed(playMusic);
+    styleButton(playButton);
+}
+
+function styleButton(btn) {
+    btn.style('background', 'rgba(0,0,0,0.5)');
+    btn.style('color', 'white');
+    btn.style('border', '1px solid rgba(255,255,255,0.7)');
+    btn.style('padding', '5px');
 }
 
 function switchShape() {
