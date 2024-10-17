@@ -78,13 +78,14 @@ function createUI() {
     const shapeNames = ['Linear Spectrum', 'Heart', 'Flower', 'Butterfly', 'Starfield']; // Include all shapes
     createDiv('Current Shape: ' + shapeNames[currentShapeIndex % shapeNames.length])
         .position(10, 80)
-        .id('shapeName');}
+        .id('shapeName');
+}
 
-        function switchShape() {
-            currentShapeIndex++;
-            const shapeNames = ['Linear Spectrum', 'Heart', 'Flower', 'Butterfly', 'Starfield'];
-            select('#shapeName').html('Current Shape: ' + shapeNames[currentShapeIndex % shapeNames.length]);
-        }
+function switchShape() {
+    currentShapeIndex++;
+    const shapeNames = ['Linear Spectrum', 'Heart', 'Flower', 'Butterfly', 'Starfield'];
+    select('#shapeName').html('Current Shape: ' + shapeNames[currentShapeIndex % shapeNames.length]);
+}
 
 // Helper function to get smoothed waveform
 function getSmoothedWaveform(smoothing) {
@@ -97,7 +98,7 @@ function drawHeart() {
     const bassEnergy = fft.getEnergy('bass');
     const dynamicStroke = map(bassEnergy, 0, 255, 1, 3); // Dynamically adjust stroke weight based on music energy
 
-    strokeWeight(dynamicStroke); 
+    strokeWeight(dynamicStroke);
     stroke(255, 105, 180);
     noFill();
 
