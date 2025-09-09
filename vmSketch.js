@@ -54,8 +54,15 @@ let flightPath = {
 // --- Add mesh music-reactive state ---
 let meshMusicState = {bass: 0, mid: 0, treble: 0};
 
+// --- Morph effect state ---
+let morphing = false;
+let morphStartTime = 0;
+let morphDuration = 4.0; // seconds (longer for smoothness)
+let morphHold = 0.5; // seconds to hold at max morph
+
 function preload() {
     const songPaths = [
+        './music/Parano.mp3',
         './music/king_shit.mp3',
         './music/babydoll.mp3',
         './music/warriyo_mortals.mp3',
@@ -77,6 +84,7 @@ function setup() {
     fft = new p5.FFT();
     fft.smooth(0.9);
     frameRate(60);
+    // Always create meshParticles
     meshParticles = createGeodesicMesh(3, 400); // higher density
 
     // Create UI controls
@@ -130,23 +138,50 @@ function draw() {
     meshPhase += 0.012; // advance global phase smoothly
     let t = millis() * 0.001 + meshPhase;
     let globalScale = 1.0 + map(meshMusicState.bass, 0, 255, -0.18, 0.32) + 0.04*sin(t*0.5);
+    // Morph effect logic
+    let morphAmount = 0;
+    if (morphing) {
+        let now = millis() / 1000.0;
+        let elapsed = now - morphStartTime;
+        let half = (morphDuration - morphHold) / 2;
+        if (elapsed < half) {
+            // Ease in
+            let p = constrain(elapsed / half, 0, 1);
+            morphAmount = p*p*(3-2*p); // smoothstep
+        } else if (elapsed < half + morphHold) {
+            // Hold at max
+            morphAmount = 1;
+        } else if (elapsed < morphDuration) {
+            // Ease out
+            let p = constrain((elapsed - half - morphHold) / half, 0, 1);
+            morphAmount = 1 - p*p*(3-2*p); // smoothstep out
+        } else {
+            morphing = false;
+            morphAmount = 0;
+        }
+    }
     for (let i = 0; i < meshParticles.length; i++) {
         let p = meshParticles[i];
+        if (!p || !p.base) continue;
         let latNorm = constrain((p.base.y/400 + 1) * 0.5, 0, 1);
         let bandIdx = floor(map(latNorm, 0, 1, 0, spectrum.length-1));
         let bandEnergy = spectrum[bandIdx] || 0;
         if (!isFinite(bandEnergy)) bandEnergy = 0;
         if (!p.energy) p.energy = bandEnergy;
         p.energy = easeLerp(p.energy, bandEnergy, 0.10);
-        let wave = sin(t*1.2 + p.base.x*0.02 + p.base.y*0.02 + p.base.z*0.02 + p.wave + p.energy*0.02) * map(p.energy,0,255,30,90)
-                 + sin(t*0.7 + p.base.y*0.03 + p.base.z*0.03) * map(p.energy,0,255,10,40);
-        let jitter = sin(t*2.5 + p.base.x*0.2 + p.base.y*0.2 + p.base.z*0.2 + p.energy*0.05) * map(p.energy,0,255,0,22);
-        // Clamp all mesh positions to avoid NaN/Infinity
-        p.x = constrain((p.base.x + (p.base.x/400) * wave + (p.base.x/400) * jitter) * globalScale, -9999, 9999);
-        p.y = constrain((p.base.y + (p.base.y/400) * wave + (p.base.y/400) * jitter) * globalScale, -9999, 9999);
-        p.z = constrain((p.base.z + (p.base.z/400) * wave + (p.base.z/400) * jitter) * globalScale, -9999, 9999);
-        // Animate color and size by energy
-        p.hue = (200 + 120*pow(p.energy/255,1.5) + 60*sin(t + p.base.x*0.01 + p.base.y*0.01 + p.base.z*0.01)) % 360;
+        // Always use sphere, but morph during song change
+        let pos = getSpherePosition(p, t, 400, morphAmount);
+        let wave = sin(t*1.2 + pos.x*0.02 + pos.y*0.02 + pos.z*0.02 + (p.wave||0) + p.energy*0.02) * map(p.energy,0,255,30,90)
+                 + sin(t*0.7 + pos.y*0.03 + pos.z*0.03) * map(p.energy,0,255,10,40);
+        let jitter = sin(t*2.5 + pos.x*0.2 + pos.y*0.2 + pos.z*0.2 + p.energy*0.05) * map(p.energy,0,255,0,22);
+        p.x = constrain((pos.x + (pos.x/400) * wave + (pos.x/400) * jitter) * globalScale, -9999, 9999);
+        p.y = constrain((pos.y + (pos.y/400) * wave + (pos.y/400) * jitter) * globalScale, -9999, 9999);
+        p.z = constrain((pos.z + (pos.z/400) * wave + (pos.z/400) * jitter) * globalScale, -9999, 9999);
+        // Aesthetic color: vibrant, spatial, and music-reactive
+        let spatial = (p.base.lat / Math.PI + p.base.lon / (2*Math.PI)) * 180;
+        let timeFlow = (t * 30 + morphAmount * 120) % 360;
+        let musicHue = 120 * pow(p.energy/255,1.5);
+        p.hue = (spatial + timeFlow + musicHue) % 360;
         p.size = constrain(2.2 + 2.5*pow(p.energy/255,1.7), 2, 7);
     }
     // Draw mesh lines between close points
@@ -178,6 +213,15 @@ function draw() {
     }
     // Handle crossfading
     if (isCrossfading) handleCrossfade();
+    // Fallback: if meshParticles is empty, draw a debug sphere
+    if (!meshParticles || meshParticles.length === 0) {
+        push();
+        fill(200, 255, 255, 180);
+        noStroke();
+        sphere(300);
+        pop();
+        return;
+    }
 }
 
 function windowResized() {
@@ -228,6 +272,9 @@ function switchSong() {
     nextSong.setVolume(0);
     nextSong.play();
     playButton.html('Pause');
+
+    // Trigger morph effect
+    triggerMorph();
 
     // Start crossfade timer
     crossfadeStartTime = millis();
@@ -392,13 +439,71 @@ function movingAverage(data, N) {
 }
 
 // --- Geodesic sphere mesh generation ---
-function createGeodesicMesh(subdivisions = 2, radius = 400) {
-    // Create icosahedron vertices
-    let t = (1 + sqrt(5)) / 2;
+function getTargetPosition(p, shape, t, radius) {
+    // Defensive: fallback to sphere if anything is missing
+    if (!p || !p.base) return {x: 0, y: 0, z: 0};
+    try {
+        switch(shape) {
+            case 'sphere':
+                return {
+                    x: p.base.x,
+                    y: p.base.y,
+                    z: p.base.z
+                };
+            case 'torus': {
+                let angle = Math.atan2(p.base.z, p.base.x);
+                let r = radius * 0.7;
+                let tubeRadius = radius * 0.3;
+                return {
+                    x: (r + tubeRadius * Math.cos(angle * 3 + t)) * Math.cos(angle),
+                    y: tubeRadius * Math.sin(angle * 3 + t),
+                    z: (r + tubeRadius * Math.cos(angle * 3 + t)) * Math.sin(angle)
+                };
+            }
+            case 'cube': {
+                let size = radius * 0.8;
+                return {
+                    x: size * Math.sign(p.base.x),
+                    y: size * Math.sign(p.base.y),
+                    z: size * Math.sign(p.base.z)
+                };
+            }
+            case 'spiral': {
+                let spiralAngle = Math.atan2(p.base.z, p.base.x);
+                let heightFactor = p.base.y / radius;
+                return {
+                    x: (radius * 0.8 * (1 - Math.abs(heightFactor))) * Math.cos(spiralAngle + heightFactor * 8 + t),
+                    y: p.base.y,
+                    z: (radius * 0.8 * (1 - Math.abs(heightFactor))) * Math.sin(spiralAngle + heightFactor * 8 + t)
+                };
+            }
+            default:
+                return {
+                    x: p.base.x,
+                    y: p.base.y,
+                    z: p.base.z
+                };
+        }
+    } catch (e) {
+        // fallback to sphere
+        return {
+            x: p.base.x,
+            y: p.base.y,
+            z: p.base.z
+        };
+    }
+}
+
+function createGeodesicMesh(subdivisions, radius) {
+    // Generate geodesic mesh vertices
+    let points = [];
+    let phi = (1 + sqrt(5)) / 2; // golden ratio
+    
+    // Create initial icosahedron vertices
     let verts = [
-        [-1,  t,  0], [ 1,  t,  0], [-1, -t,  0], [ 1, -t,  0],
-        [ 0, -1,  t], [ 0,  1,  t], [ 0, -1, -t], [ 0,  1, -t],
-        [ t,  0, -1], [ t,  0,  1], [-t,  0, -1], [-t,  0,  1]
+        [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
+        [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
+        [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1]
     ];
     verts = verts.map(v => {
         let mag = sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
@@ -447,9 +552,14 @@ function createGeodesicMesh(subdivisions = 2, radius = 400) {
     // Build meshParticles
     let mesh = [];
     for (let v of unique) {
+        // Calculate spherical coordinates
+        let x = v[0], y = v[1], z = v[2];
+        let r = Math.sqrt(x*x + y*y + z*z);
+        let lat = Math.acos(y / r); // polar angle
+        let lon = Math.atan2(z, x); // azimuthal angle
         mesh.push({
-            base: {x: v[0]*radius, y: v[1]*radius, z: v[2]*radius},
-            x: v[0]*radius, y: v[1]*radius, z: v[2]*radius,
+            base: {x: x*radius, y: y*radius, z: z*radius, lat, lon},
+            x: x*radius, y: y*radius, z: z*radius,
             wave: random(TWO_PI),
             hue: random(180,320)
         });
@@ -462,4 +572,25 @@ function easeLerp(a, b, t) {
     t = constrain(t, 0, 1);
     t = t*t*(3-2*t); // smoothstep
     return a + (b-a)*t;
+}
+
+// --- Morph effect state ---
+// (removed duplicate declarations)
+
+function triggerMorph() {
+    morphing = true;
+    morphStartTime = millis() / 1000.0;
+}
+
+function getSpherePosition(p, t, radius, morphAmount) {
+    // morphAmount: 0 = normal, 1 = fully morphed
+    // We'll do a crazy smooth effect: pulse, twist, and ripple
+    let base = p.base;
+    let r = radius + 60 * Math.sin(t + base.x * 0.01 + base.y * 0.01 + base.z * 0.01) * morphAmount;
+    let twist = morphAmount * Math.sin(t * 2 + base.y * 0.02) * 0.7;
+    let ripple = morphAmount * Math.sin(t * 3 + base.x * 0.03 + base.z * 0.03) * 0.5;
+    let x = r * Math.sin(base.lat + twist) * Math.cos(base.lon + ripple);
+    let y = r * Math.cos(base.lat + twist);
+    let z = r * Math.sin(base.lat + twist) * Math.sin(base.lon + ripple);
+    return {x, y, z};
 }
