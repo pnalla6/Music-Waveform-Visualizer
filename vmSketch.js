@@ -1,18 +1,58 @@
-// Number of particles
-const NUM_PARTICLES = 500;
+// --- GLOBALS ---
+const NUM_PARTICLES = 2500;
 let particles = [];
 
 // UI elements
-let shapeButton, switchSongButton, playButton;
+let playButton, switchSongButton;
 let fft;
 let musicFiles = []; // Array to hold multiple songs
 let currentSongIndex = 0;
 let crossfadeDuration = 3; // Duration of crossfade in seconds
 let isCrossfading = false;
 
-// Array of shape functions
-let shapeFunctions;
-let currentShapeIndex = 0;
+// 3D camera/space/starfield variables
+let cam;
+let baseSpeed = 150;
+let currentSpeed = baseSpeed;
+let targetSpeed = baseSpeed;
+let cameraZ = 0;
+let cameraX = 0;
+let cameraY = 0;
+let targetX = 0;
+let targetY = 0;
+let radius = 3000;
+
+// --- Camera interaction variables ---
+let camRotX = 0;
+let camRotY = 0;
+let targetCamRotX = 0;
+let targetCamRotY = 0;
+let isMouseDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+
+// --- Camera orbit variables ---
+let camAngleX = 0;
+let camAngleY = 0;
+let targetCamAngleX = 0.5;
+let targetCamAngleY = 0.5;
+let camRadius = 1200;
+let isDragging = false;
+
+// --- Mesh parameters ---
+const MESH_ROWS = 32;
+const MESH_COLS = 64;
+let meshParticles = [];
+
+// Flight path variables
+let flightPath = {
+    angle: 0,
+    turbulence: 0,
+    targetTurbulence: 0
+};
+
+// --- Add mesh music-reactive state ---
+let meshMusicState = {bass: 0, mid: 0, treble: 0};
 
 function preload() {
     const songPaths = [
@@ -20,6 +60,7 @@ function preload() {
         './music/babydoll.mp3',
         './music/warriyo_mortals.mp3',
         './music/am_i_dreaming.mp3',
+        './music/million_dollar_baby.mp3',
     ];
 
     // Load songs into musicFiles array
@@ -30,51 +71,134 @@ function preload() {
 }
 
 function setup() {
-    createCanvas(windowWidth, windowHeight);
+    createCanvas(windowWidth, windowHeight, WEBGL);
+    colorMode(HSB, 360, 255, 255, 255);
     angleMode(RADIANS);
     fft = new p5.FFT();
     fft.smooth(0.9);
     frameRate(60);
-
-    // Initialize particles
-    for (let i = 0; i < NUM_PARTICLES; i++) {
-        particles.push(new Particle());
-    }
+    meshParticles = createGeodesicMesh(3, 400); // higher density
 
     // Create UI controls
     createUI();
-
-    // Initialize shape functions
-    shapeFunctions = [linearSpectrum, drawHeart, drawFlower, drawButterfly, starfield];
 
     // Start playing the first song
     if (musicFiles.length > 0) {
         musicFiles[currentSongIndex].play();
         playButton.html('Pause');
     }
+
+    // Create camera and set initial perspective
+    cam = createCamera();
+    perspective(PI/3, width/height, 1, radius * 2);
+    strokeWeight(2);  // Larger points for stars
 }
 
+// --- Global mesh phase for smooth animation ---
+let meshPhase = 0;
+
 function draw() {
-    background(0);
-    translate(width / 2, height / 2);
-
-    // Analyze music spectrum
-    fft.analyze();
-
-    // Call the current shape function
-    const currentFunction = shapeFunctions[currentShapeIndex % shapeFunctions.length];
-    if (currentFunction) {
-        currentFunction();
+    // Soft vignette background
+    push();
+    resetMatrix();
+    noStroke();
+    for (let r = 0; r < width/2; r += 8) {
+        fill(0, 0, 16, map(r, 0, width/2, 120, 0));
+        ellipse(width/2, height/2, width-r, height-r);
     }
-
+    pop();
+    background(0, 0, 16, 255);
+    let spectrum = fft.analyze();
+    let bass = fft.getEnergy("bass");
+    let mid = fft.getEnergy("mid");
+    let treble = fft.getEnergy("treble");
+    // Smoothly lerp music state for smooth motion
+    meshMusicState.bass = easeLerp(meshMusicState.bass, bass, 0.06);
+    meshMusicState.mid = easeLerp(meshMusicState.mid, mid, 0.06);
+    meshMusicState.treble = easeLerp(meshMusicState.treble, treble, 0.06);
+    // Camera inertia/orbit
+    if (!isDragging) {
+        targetCamAngleX += 0.0025;
+        targetCamAngleY += 0.0012;
+    }
+    camAngleX = easeLerp(camAngleX, targetCamAngleX, 0.06);
+    camAngleY = easeLerp(camAngleY, targetCamAngleY, 0.06);
+    let camX = camRadius * sin(camAngleX) * cos(camAngleY);
+    let camY = camRadius * sin(camAngleY);
+    let camZ = camRadius * cos(camAngleX) * cos(camAngleY);
+    camera(camX, camY, camZ, 0, 0, 0, 0, 1, 0);
+    meshPhase += 0.012; // advance global phase smoothly
+    let t = millis() * 0.001 + meshPhase;
+    let globalScale = 1.0 + map(meshMusicState.bass, 0, 255, -0.18, 0.32) + 0.04*sin(t*0.5);
+    for (let i = 0; i < meshParticles.length; i++) {
+        let p = meshParticles[i];
+        let latNorm = constrain((p.base.y/400 + 1) * 0.5, 0, 1);
+        let bandIdx = floor(map(latNorm, 0, 1, 0, spectrum.length-1));
+        let bandEnergy = spectrum[bandIdx] || 0;
+        if (!isFinite(bandEnergy)) bandEnergy = 0;
+        if (!p.energy) p.energy = bandEnergy;
+        p.energy = easeLerp(p.energy, bandEnergy, 0.10);
+        let wave = sin(t*1.2 + p.base.x*0.02 + p.base.y*0.02 + p.base.z*0.02 + p.wave + p.energy*0.02) * map(p.energy,0,255,30,90)
+                 + sin(t*0.7 + p.base.y*0.03 + p.base.z*0.03) * map(p.energy,0,255,10,40);
+        let jitter = sin(t*2.5 + p.base.x*0.2 + p.base.y*0.2 + p.base.z*0.2 + p.energy*0.05) * map(p.energy,0,255,0,22);
+        // Clamp all mesh positions to avoid NaN/Infinity
+        p.x = constrain((p.base.x + (p.base.x/400) * wave + (p.base.x/400) * jitter) * globalScale, -9999, 9999);
+        p.y = constrain((p.base.y + (p.base.y/400) * wave + (p.base.y/400) * jitter) * globalScale, -9999, 9999);
+        p.z = constrain((p.base.z + (p.base.z/400) * wave + (p.base.z/400) * jitter) * globalScale, -9999, 9999);
+        // Animate color and size by energy
+        p.hue = (200 + 120*pow(p.energy/255,1.5) + 60*sin(t + p.base.x*0.01 + p.base.y*0.01 + p.base.z*0.01)) % 360;
+        p.size = constrain(2.2 + 2.5*pow(p.energy/255,1.7), 2, 7);
+    }
+    // Draw mesh lines between close points
+    blendMode(ADD);
+    strokeWeight(1.2);
+    for (let i = 0; i < meshParticles.length; i++) {
+        let p1 = meshParticles[i];
+        for (let j = i+1; j < meshParticles.length; j++) {
+            let p2 = meshParticles[j];
+            let d = dist(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+            if (d < 70) {
+                let alpha = map(d, 0, 70, 120, 0);
+                let hue = (p1.hue + p2.hue) * 0.5;
+                stroke(hue, 180, 255, alpha);
+                line(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+            }
+        }
+    }
+    // Draw points with glow
+    noStroke();
+    for (let i = 0; i < meshParticles.length; i++) {
+        let p = meshParticles[i];
+        let glow = 180 + 60*sin(t + p.base.x*0.01 + p.base.y*0.01);
+        fill(p.hue, 180, glow, 220);
+        push(); translate(p.x, p.y, p.z); sphere(p.size); pop();
+        // Soft outer glow
+        fill(p.hue, 80, 255, 30);
+        push(); translate(p.x, p.y, p.z); sphere(p.size*2.2); pop();
+    }
     // Handle crossfading
-    if (isCrossfading) {
-        handleCrossfade();
-    }
+    if (isCrossfading) handleCrossfade();
 }
 
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
+}
+
+function mousePressed() {
+    isDragging = true;
+    lastMouseX = mouseX;
+    lastMouseY = mouseY;
+}
+function mouseReleased() { isDragging = false; }
+function mouseDragged() {
+    if (isDragging) {
+        let dx = mouseX - lastMouseX;
+        let dy = mouseY - lastMouseY;
+        targetCamAngleX += dx * 0.01;
+        targetCamAngleY = constrain(targetCamAngleY + dy * 0.01, -PI/2, PI/2);
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
+    }
 }
 
 // Play or pause the music
@@ -138,31 +262,21 @@ function handleCrossfade() {
 
 // Create UI controls
 function createUI() {
-    // Shape Switch Button
-    shapeButton = createButton('Switch Shape');
-    shapeButton.position(10, 55);
-    shapeButton.mousePressed(switchShape);
-    styleButton(shapeButton);
-
-    const shapeNames = ['Linear Spectrum', 'Heart', 'Flower', 'Butterfly', 'Starfield'];
-    createDiv('Current Shape: ' + shapeNames[currentShapeIndex % shapeNames.length])
-        .position(10, 80)
-        .id('shapeName')
-        .style('color', 'white')
-        .style('background', 'rgba(0,0,0,0.5)')
-        .style('padding', '5px');
-
-    // Switch Song Button
-    switchSongButton = createButton('Switch Song');
-    switchSongButton.position(10, 105);
+    // Create song switch button
+    switchSongButton = createButton('Next Song');
+    switchSongButton.position(10, 40);
+    switchSongButton.style('background-color', 'rgba(0, 0, 0, 0.5)');
+    switchSongButton.style('color', 'white');
+    switchSongButton.style('border', '1px solid rgba(255, 255, 255, 0.7)');
     switchSongButton.mousePressed(switchSong);
-    styleButton(switchSongButton);
 
-    // Play/Pause Button
-    playButton = createButton('Pause');
-    playButton.position(10, 130);
+    // Create play/pause button
+    playButton = createButton('Play');
+    playButton.position(10, 10);
+    playButton.style('background-color', 'rgba(0, 0, 0, 0.5)');
+    playButton.style('color', 'white');
+    playButton.style('border', '1px solid rgba(255, 255, 255, 0.7)');
     playButton.mousePressed(playMusic);
-    styleButton(playButton);
 }
 
 function styleButton(btn) {
@@ -172,179 +286,87 @@ function styleButton(btn) {
     btn.style('padding', '5px');
 }
 
-function switchShape() {
-    currentShapeIndex++;
-    const shapeNames = ['Linear Spectrum', 'Heart', 'Flower', 'Butterfly', 'Starfield'];
-    select('#shapeName').html('Current Shape: ' + shapeNames[currentShapeIndex % shapeNames.length]);
-}
-
 // Helper function to get smoothed waveform
 function getSmoothedWaveform(smoothing) {
     const waveform = fft.waveform();
     return movingAverage(waveform, smoothing);
 }
 
-// Draw a heart shape synchronized with music
-function drawHeart() {
-    const bassEnergy = fft.getEnergy('bass');
-    const dynamicStroke = map(bassEnergy, 0, 255, 1, 3); // Dynamically adjust stroke weight based on music energy
-
-    strokeWeight(dynamicStroke);
-    stroke(255, 105, 180);
-    noFill();
-
-    const smoothedWaveform = getSmoothedWaveform(10);
-    const totalPoints = 360;
-
-    beginShape();
-    for (let i = 0; i <= totalPoints; i++) {
-        const t = map(i, 0, totalPoints, -PI, PI);
-        const index = floor(map(i, 0, totalPoints, 0, smoothedWaveform.length - 1));
-        const scaleFactor = map(smoothedWaveform[index], -1, 1, 0.8, 1.2);
-
-        const x = 16 * pow(sin(t), 3) * scaleFactor * 15;
-        const y = -(13 * cos(t) - 5 * cos(2 * t) - 2 * cos(3 * t) - cos(4 * t)) * scaleFactor * 15;
-
-        curveVertex(x, y);
-    }
-    endShape(CLOSE);
-}
-
-// Draw a flower shape synchronized with music
-function drawFlower() {
-    strokeWeight(2);
-    stroke(255, 182, 193);
-    noFill();
-
-    const smoothedWaveform = getSmoothedWaveform(10);
-    const petals = 6;
-    const totalPoints = 360;
-
-    beginShape();
-    for (let i = 0; i <= totalPoints; i++) {
-        const angle = map(i, 0, totalPoints, 0, TWO_PI);
-        const index = floor(map(i, 0, totalPoints, 0, smoothedWaveform.length - 1));
-        const scaleFactor = map(smoothedWaveform[index], -1, 1, 0.8, 1.2);
-
-        const r = 150 * scaleFactor * sin(petals * angle);
-        const x = r * cos(angle);
-        const y = r * sin(angle);
-
-        curveVertex(x, y);
-    }
-    endShape(CLOSE);
-}
-
-// Draw a butterfly shape synchronized with music
-function drawButterfly() {
-    strokeWeight(2);
-    stroke(219, 112, 147);
-    noFill();
-
-    const smoothedWaveform = getSmoothedWaveform(10);
-    const totalPoints = 360;
-
-    beginShape();
-    for (let i = 0; i <= totalPoints; i++) {
-        const t = map(i, 0, totalPoints, -PI, PI);
-        const index = floor(map(i, 0, totalPoints, 0, smoothedWaveform.length - 1));
-        const scaleFactor = map(smoothedWaveform[index], -1, 1, 0.8, 1.2);
-
-        const expCosT = exp(cos(t));
-        const sinT = sin(t);
-        const cosT = cos(t);
-        const sinT12 = sin(t / 12);
-        const commonTerm = expCosT - 2 * cos(4 * t) - pow(sinT12, 5);
-
-        const x = sinT * commonTerm * 50 * scaleFactor;
-        const y = -cosT * commonTerm * 50 * scaleFactor;
-
-        curveVertex(x, y);
-    }
-    endShape(CLOSE);
-}
-
-// Linear Spectrum Visualization
-function linearSpectrum() {
-    strokeWeight(1.5);
-    stroke(200, 200, 255);
-    noFill();
-
-    const smoothedWaveform = getSmoothedWaveform(300);
-
-    beginShape();
-    for (let i = 0; i < smoothedWaveform.length; i += 4) {
-        const x = map(i, 0, smoothedWaveform.length - 1, -width / 2, width / 2);
-        const y = map(smoothedWaveform[i], -1, 1, height / 6, -height / 6);
-
-        curveVertex(x, y);
-    }
-    endShape();
-}
-
-// Starfield effect with particles
-function starfield() {
-    for (const particle of particles) {
-        particle.update();
-        particle.show();
-    }
-}
-
 // Particle class for starfield effect
 class Particle {
     constructor() {
-        this.x = random(-width / 2, width / 2);
-        this.y = random(-height / 2, height / 2);
-        this.z = random(width / 2);
-        this.baseColor = color(255, 255, 255);
-        this.sparkle = random(100, 255);
-        this.speed = random(0.2, 0.5);
-        this.bassEnergyAvg = 0;
-        this.energyDecayRate = 0.05;
+        this.reset();
+        this.z = random(-radius, 0);
     }
 
-    update() {
-        const bassEnergy = fft.getEnergy('bass');
-        this.bassEnergyAvg = lerp(this.bassEnergyAvg, bassEnergy, this.energyDecayRate);
-        const energyThreshold = this.bassEnergyAvg;
+    reset() {
+        let angle = random(TWO_PI);
+        let rad = random(100, 1200); // wider field
+        this.x = cos(angle) * rad;
+        this.y = sin(angle) * rad;
+        this.z = radius;
+        this.size = random(0.7, 1.7);
+        this.baseSize = this.size;
+        this.hue = random(200, 260); // blue-violet range
+        this.brightness = random(180, 255);
+        this.alpha = random(120, 200);
+        this.speedMultiplier = random(0.7, 1.3);
+        this.sideSpeed = random(-0.3, 0.3);
+        this.verticalSpeed = random(-0.3, 0.3);
+        this.trail = [];
+        this.maxTrailLength = floor(random(8, 18));
+    }
 
-        const reverse = bassEnergy < energyThreshold;
-        const targetSpeed = reverse
-            ? map(bassEnergy, 0, energyThreshold, -0.2, 0)
-            : map(bassEnergy, energyThreshold, 255, 0.05, 1.5);
-        this.speed = lerp(this.speed, targetSpeed, reverse ? 0.6 : 0.3);
+    update(bass, mid, treble) {
+        let speedMultiplier = map(bass, 0, 255, 0.5, 2);
+        let speed = currentSpeed * speedMultiplier * this.speedMultiplier;
 
-        this.z -= this.speed * 20;
-
-        if (this.z < 1 || this.z > width) {
-            this.resetPosition();
+        if (frameCount % 2 === 0) {
+            this.trail.unshift({x: this.x, y: this.y, z: this.z});
+            if (this.trail.length > this.maxTrailLength) {
+                this.trail.pop();
+            }
         }
+
+        let turbulence = map(mid, 0, 255, 0, 1.2);
+        this.x += this.sideSpeed * turbulence;
+        this.y += this.verticalSpeed * turbulence;
+        this.z -= speed;
+
+        if (this.z < -1000) {
+            this.reset();
+        }
+
+        let distFromCamera = abs(this.z - cameraZ);
+        let normalizedDist = constrain(map(distFromCamera, 0, radius, 1, 0), 0, 1);
+
+        let trebleSize = map(treble, 0, 255, 0, 1.2);
+        this.size = this.baseSize * normalizedDist + trebleSize;
+
+        let audioBrightness = map(mid + treble, 0, 510, 0, 80);
+        this.brightness = map(normalizedDist, 0, 1, 255, 80) + audioBrightness;
+        this.alpha = map(normalizedDist, 0, 1, 200, 0);
     }
 
-    resetPosition() {
-        this.z = random(width / 2, width);
-        this.x = random(-width / 2, width / 2);
-        this.y = random(-height / 2, height / 2);
-        this.sparkle = random(100, 255);
-    }
+    display() {
+        colorMode(HSB, 360, 255, 255, 255);
+        // Draw trails with glow
+        for (let i = 0; i < this.trail.length; i++) {
+            let pos = this.trail[i];
+            let trailAlpha = map(i, 0, this.trail.length, this.alpha * 0.25, 0);
+            stroke(this.hue, 80, this.brightness, trailAlpha);
+            strokeWeight(map(i, 0, this.trail.length, this.size * 1.2, this.size * 0.2));
+            point(pos.x, pos.y, pos.z);
+        }
 
-    show() {
-        const sx = map(this.x / this.z, 0, 1, 0, width);
-        const sy = map(this.y / this.z, 0, 1, 0, height);
-        const r = map(this.z, 0, width / 2, 8, 0);
-
-        const shouldSparkle = random() < 0.1;
-        const glitterColor = shouldSparkle
-            ? color(
-                this.baseColor.levels[0] + random(-this.sparkle, this.sparkle),
-                this.baseColor.levels[1] + random(-this.sparkle, this.sparkle),
-                this.baseColor.levels[2] + random(-this.sparkle, this.sparkle)
-            )
-            : this.baseColor;
-
-        noStroke();
-        fill(glitterColor);
-        ellipse(sx, sy, r);
+        // Draw main particle with glow
+        stroke(this.hue, 60, this.brightness, this.alpha);
+        strokeWeight(this.size * 2.2);
+        point(this.x, this.y, this.z);
+        stroke(this.hue, 0, 255, this.alpha * 0.7);
+        strokeWeight(this.size * 0.7);
+        point(this.x, this.y, this.z);
+        colorMode(RGB, 255);
     }
 }
 
@@ -367,4 +389,77 @@ function movingAverage(data, N) {
     }
 
     return result;
+}
+
+// --- Geodesic sphere mesh generation ---
+function createGeodesicMesh(subdivisions = 2, radius = 400) {
+    // Create icosahedron vertices
+    let t = (1 + sqrt(5)) / 2;
+    let verts = [
+        [-1,  t,  0], [ 1,  t,  0], [-1, -t,  0], [ 1, -t,  0],
+        [ 0, -1,  t], [ 0,  1,  t], [ 0, -1, -t], [ 0,  1, -t],
+        [ t,  0, -1], [ t,  0,  1], [-t,  0, -1], [-t,  0,  1]
+    ];
+    verts = verts.map(v => {
+        let mag = sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+        return [v[0]/mag, v[1]/mag, v[2]/mag];
+    });
+    let faces = [
+        [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
+        [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+        [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],
+        [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]
+    ];
+    // Subdivide faces
+    function midpoint(a, b) {
+        return [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2];
+    }
+    let cache = {};
+    function getMid(a, b) {
+        let key = a < b ? a+','+b : b+','+a;
+        if (cache[key]) return cache[key];
+        let m = midpoint(verts[a], verts[b]);
+        let mag = sqrt(m[0]*m[0]+m[1]*m[1]+m[2]*m[2]);
+        m = [m[0]/mag, m[1]/mag, m[2]/mag];
+        verts.push(m);
+        cache[key] = verts.length-1;
+        return verts.length-1;
+    }
+    for (let s=0; s<subdivisions; s++) {
+        let faces2 = [];
+        for (let f of faces) {
+            let a = f[0], b = f[1], c = f[2];
+            let ab = getMid(a,b), bc = getMid(b,c), ca = getMid(c,a);
+            faces2.push([a,ab,ca],[b,bc,ab],[c,ca,bc],[ab,bc,ca]);
+        }
+        faces = faces2;
+    }
+    // Remove duplicate verts
+    let unique = [];
+    let mapIdx = {};
+    for (let v of verts) {
+        let key = v.map(x=>x.toFixed(5)).join(',');
+        if (!(key in mapIdx)) {
+            mapIdx[key] = unique.length;
+            unique.push(v);
+        }
+    }
+    // Build meshParticles
+    let mesh = [];
+    for (let v of unique) {
+        mesh.push({
+            base: {x: v[0]*radius, y: v[1]*radius, z: v[2]*radius},
+            x: v[0]*radius, y: v[1]*radius, z: v[2]*radius,
+            wave: random(TWO_PI),
+            hue: random(180,320)
+        });
+    }
+    return mesh;
+}
+
+// --- Utility: cubic easing for extra smoothness ---
+function easeLerp(a, b, t) {
+    t = constrain(t, 0, 1);
+    t = t*t*(3-2*t); // smoothstep
+    return a + (b-a)*t;
 }
