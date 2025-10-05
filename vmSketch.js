@@ -62,6 +62,7 @@ let morphHold = 0.5; // seconds to hold at max morph
 
 function preload() {
     const songPaths = [
+        './music/the_way_i_are.mp3',
         './music/Parano.mp3',
         './music/king_shit.mp3',
         './music/babydoll.mp3',
